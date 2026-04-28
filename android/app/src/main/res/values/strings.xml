@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">StoGramm</string>
-    <string name="title_activity_main">StoGramm</string>
+    <string name="app_name">StoGram</string>
+    <string name="title_activity_main">StoGram</string>
     <string name="package_name">com.stogramm.app</string>
     <string name="custom_url_scheme">com.stogramm.app</string>
 </resources>

@@ -21,6 +21,8 @@ const storage = getStorage(app);
 const auth = getAuth(app);
 
 function App() {
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [fullscreenImage, setFullscreenImage] = useState(null);
   const [user, setUser] = useState(null);
   const [chats, setChats] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
@@ -53,9 +55,21 @@ function App() {
   const [readReceipts, setReadReceipts] = useState({});
   const [defaultReaction, setDefaultReaction] = useState('❤️');
   const [reactions, setReactions] = useState({});
+  const [showPlusButton, setShowPlusButton] = useState(true);
+  const [lastScrollTop, setLastScrollTop] = useState(0);
+  const [viewedProfile, setViewedProfile] = useState(null);
+  const [userDescription, setUserDescription] = useState('');
+  const [userLanguage, setUserLanguage] = useState('ru');
+  const [profileSection, setProfileSection] = useState('main');
+  const [privacySettings, setPrivacySettings] = useState({
+    hideLastSeen: false,
+    hideAvatar: false,
+    hideDescription: false
+  });
 
   const [touchStartX, setTouchStartX] = useState(0);
   const [touchStartY, setTouchStartY] = useState(0);
+  const [touchMoveX, setTouchMoveX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const [touchStartChat, setTouchStartChat] = useState(0);
   const [lastTap, setLastTap] = useState(0);
@@ -64,11 +78,17 @@ function App() {
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const bgFileInputRef = useRef(null);
+  const photoInputRef = useRef(null);
   const messagesListenerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingListenerRef = useRef(null);
   const sendingRef = useRef(false);
   const contextMenuRef = useRef(null);
+  const chatListRef = useRef(null);
+  const swipeTrackRef = useRef(null);
+
+  const tabs = ['chats', 'profile', 'groups'];
+  const currentTabIndex = tabs.indexOf(activeTab);
 
   const themes = {
     dark: { bg: '#0f0f0f', cardBg: '#1a1a1a', text: '#ffffff', border: '#2c2c2c', name: 'Тёмная' },
@@ -96,8 +116,67 @@ function App() {
 
   const availableReactions = ['❤️', '👍', '😂', '😮', '😢', '😡', '🔥', '👏', '🎉', '💯'];
 
-  const tabs = ['chats', 'profile', 'groups', 'search'];
-  const currentTabIndex = tabs.indexOf(activeTab);
+  const languages = [
+    { code: 'ru', name: 'Русский' },
+    { code: 'en', name: 'English' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'zh', name: '中文' }
+  ];
+
+  const translations = {
+    ru: {
+      chats: 'Чаты', profile: 'Профиль', groups: 'Группы',
+      online: 'онлайн', typing: 'печатает...',
+      edit: '✏️ Изменить', delete: '🗑️ Удалить', cancel: '✖ Отмена',
+      send: 'Отправить', message: 'Сообщение...', editMsg: 'Измените...',
+      login: '📧 Войти', register: '📧 Зарегистрироваться', logout: '🚪 Выйти',
+      noAccount: 'Нет аккаунта? Зарегистрироваться', hasAccount: 'Уже есть аккаунт? Войти',
+      noChats: '📭 Нет диалогов', findUser: 'Найти пользователя', searchUser: 'Поиск пользователей',
+      createGroup: 'Создать группу', groupName: 'Название',
+      members: 'участников', create: '➕ Создать',
+      bgChat: 'Фон чата', theme: 'Тема', accent: 'Цвет акцента',
+      iconColor: 'Цвет иконок', reaction: 'Реакция по умолчанию',
+      doubleTap: 'Двойное нажатие поставит эту реакцию',
+      language: 'Язык', privacy: 'Конфиденциальность',
+      hideLastSeen: 'Скрыть время захода',
+      hideAvatar: 'Скрыть аватарку',
+      hideDescription: 'Скрыть описание',
+      description: 'Описание',
+      save: 'Сохранить',
+      wasRecently: 'был', minAgo: 'мин назад', hourAgo: 'ч назад', dayAgo: 'дн назад',
+      edited: '(изменено)', participants: 'Участники', close: 'Закрыть',
+      deleteChat: 'Удалить чат', createGroupTitle: 'Создать группу',
+      selectMembers: 'Выберите участников', downloadApp: '📱 Скачать приложение',
+      settings: 'Настройки чата', customBg: '🖼️ Своё',
+      back: '← Назад'
+    },
+    en: {
+      chats: 'Chats', profile: 'Profile', groups: 'Groups',
+      online: 'online', typing: 'typing...',
+      edit: '✏️ Edit', delete: '🗑️ Delete', cancel: '✖ Cancel',
+      send: 'Send', message: 'Message...', editMsg: 'Edit...',
+      login: '📧 Login', register: '📧 Register', logout: '🚪 Logout',
+      noAccount: 'No account? Register', hasAccount: 'Have account? Login',
+      noChats: '📭 No chats', findUser: 'Find user', searchUser: 'Search users',
+      createGroup: 'Create group', groupName: 'Name',
+      members: 'members', create: '➕ Create',
+      bgChat: 'Chat background', theme: 'Theme', accent: 'Accent color',
+      iconColor: 'Icon color', reaction: 'Default reaction',
+      doubleTap: 'Double tap sets this reaction',
+      language: 'Language', privacy: 'Privacy',
+      hideLastSeen: 'Hide last seen', hideAvatar: 'Hide avatar',
+      hideDescription: 'Hide description',
+      description: 'Description', save: 'Save',
+      wasRecently: 'was', minAgo: 'min ago', hourAgo: 'h ago', dayAgo: 'd ago',
+      edited: '(edited)', participants: 'Participants', close: 'Close',
+      deleteChat: 'Delete chat', createGroupTitle: 'Create Group',
+      selectMembers: 'Select members', downloadApp: '📱 Download App',
+      settings: 'Chat Settings', customBg: '🖼️ Custom',
+      back: '← Back'
+    }
+  };
+
+  const t = translations[userLanguage] || translations.ru;
 
   useEffect(() => {
     const savedUser = localStorage.getItem('stogramm_user');
@@ -106,19 +185,17 @@ function App() {
       setUser({ uid: parsed.uid, name: parsed.name, email: parsed.email });
       loadChats(parsed.name);
     }
-    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userRef = ref(db, `users/${firebaseUser.uid}`);
         const snapshot = await get(userRef);
-        if (snapshot.exists() && snapshot.val().username) {
+        if (snapshot.exists()) {
           const userData = snapshot.val();
           setUser({ uid: firebaseUser.uid, name: userData.username, email: firebaseUser.email });
-          localStorage.setItem('stogramm_user', JSON.stringify({
-            uid: firebaseUser.uid,
-            name: userData.username,
-            email: firebaseUser.email
-          }));
+          if (userData.description) setUserDescription(userData.description);
+          if (userData.language) setUserLanguage(userData.language);
+          if (userData.privacySettings) setPrivacySettings(userData.privacySettings);
+          localStorage.setItem('stogramm_user', JSON.stringify({ uid: firebaseUser.uid, name: userData.username, email: firebaseUser.email }));
           const statusRef = ref(db, `status/${userData.username}`);
           await set(statusRef, { online: true, lastSeen: Date.now() });
           onDisconnect(statusRef).set({ online: false, lastSeen: Date.now() });
@@ -129,9 +206,7 @@ function App() {
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
         }
       } else {
-        if (!localStorage.getItem('stogramm_user')) {
-          setUser(null);
-        }
+        if (!localStorage.getItem('stogramm_user')) setUser(null);
         setShowUsernamePrompt(false);
       }
       setAuthLoading(false);
@@ -149,9 +224,7 @@ function App() {
 
   useEffect(() => {
     if (currentChat && user && messages.length > 0) {
-      update(ref(db, `readReceipts/${currentChat.id}/${user.name}`), { 
-        readAt: Date.now(), lastReadId: messages[messages.length - 1].id 
-      });
+      update(ref(db, `readReceipts/${currentChat.id}/${user.name}`), { readAt: Date.now(), lastReadId: messages[messages.length - 1].id });
     }
   }, [messages, currentChat, user]);
 
@@ -172,7 +245,7 @@ function App() {
       if (savedAccent) setAccentColor(savedAccent);
       if (savedIconColor) setIconColor(savedIconColor);
       const savedBg = localStorage.getItem(`chat_bg_${user.uid}`);
-      if (savedBg && savedBg !== 'undefined') setChatBackground(savedBg);
+      if (savedBg && savedBg !== 'undefined' && savedBg !== '#0f0f0f') setChatBackground(savedBg);
       loadProfileImage();
     }
   }, [user, showUsernamePrompt]);
@@ -187,10 +260,7 @@ function App() {
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('touchstart', handleClickOutside); };
   }, [contextMenuState.visible]);
 
   const loadProfileImage = async () => {
@@ -199,7 +269,7 @@ function App() {
     if (snap.exists()) setProfileImage(snap.val());
   };
 
-  const changeTheme = (t) => { setTheme(t); localStorage.setItem(`theme_${user?.uid}`, t); };
+  const changeTheme = (th) => { setTheme(th); localStorage.setItem(`theme_${user?.uid}`, th); };
   const changeAccent = (c) => { setAccentColor(c); localStorage.setItem(`accent_${user?.uid}`, c); };
   const changeIconColor = (c) => { setIconColor(c); localStorage.setItem(`icon_${user?.uid}`, c); };
   const getChatId = (u1, u2) => [u1, u2].sort().join('_');
@@ -228,14 +298,48 @@ function App() {
     setUnreadChats(u);
   };
 
-  const handleSwipeStart = (e) => { setTouchStartX(e.touches[0].clientX); setTouchStartY(e.touches[0].clientY); setSwiping(true); };
-  const handleSwipeMove = (e) => { if (swiping && Math.abs(e.touches[0].clientX - touchStartX) > 30) e.preventDefault(); };
+  // Плавный свайп с отслеживанием пальца
+  const handleSwipeStart = (e) => {
+    setTouchStartX(e.touches[0].clientX);
+    setTouchStartY(e.touches[0].clientY);
+    setSwiping(true);
+  };
+  
+  const handleSwipeMove = (e) => {
+    if (!swiping) return;
+    const deltaX = e.touches[0].clientX - touchStartX;
+    const deltaY = e.touches[0].clientY - touchStartY;
+    setTouchMoveX(deltaX);
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 5) {
+      e.preventDefault();
+      if (swipeTrackRef.current) {
+        const baseTranslate = -currentTabIndex * window.innerWidth;
+        const newTranslate = baseTranslate + deltaX;
+        swipeTrackRef.current.style.transition = 'none';
+        swipeTrackRef.current.style.transform = `translateX(${newTranslate}px)`;
+      }
+    }
+  };
+  
   const handleSwipeEnd = (e) => {
-    if (!swiping) return; setSwiping(false);
-    const d = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(d) > 50) {
-      if (d > 0 && currentTabIndex > 0) setActiveTab(tabs[currentTabIndex - 1]);
-      else if (d < 0 && currentTabIndex < tabs.length - 1) setActiveTab(tabs[currentTabIndex + 1]);
+    if (!swiping) return;
+    setSwiping(false);
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(deltaX) > 50) {
+      if (deltaX > 0 && currentTabIndex > 0) setActiveTab(tabs[currentTabIndex - 1]);
+      else if (deltaX < 0 && currentTabIndex < tabs.length - 1) setActiveTab(tabs[currentTabIndex + 1]);
+    }
+    if (swipeTrackRef.current) {
+      swipeTrackRef.current.style.transition = 'transform 0.3s ease';
+      swipeTrackRef.current.style.transform = `translateX(-${currentTabIndex * 100}%)`;
+    }
+  };
+
+  // Свайп для выхода из экранов (поиск, настройки и т.д.)
+  const handleBackSwipe = (e, callback) => {
+    const endX = e.changedTouches[0].clientX;
+    if (endX - touchStartChat > 70) {
+      callback();
     }
   };
 
@@ -244,17 +348,92 @@ function App() {
 
   const handleBgUpload = (e) => {
     const f = e.target.files[0];
-    if (f) { const r = new FileReader(); r.onloadend = () => { setChatBackground(r.result); localStorage.setItem(`chat_bg_${user.uid}`, r.result); }; r.readAsDataURL(f); }
-  };
-
-  const handleImageUpload = async (e) => {
-    const f = e.target.files[0];
-    if (f && user) {
-      setProfileImage(URL.createObjectURL(f));
-      const up = await uploadBytes(storageRef(storage, `avatars/${user.uid}`), f);
-      await set(ref(db, `users/${user.uid}/avatar`), await getDownloadURL(up.ref));
+    if (f) { 
+      try {
+        const r = new FileReader(); 
+        r.onloadend = () => { 
+          const bg = r.result;
+          setChatBackground(bg); 
+          localStorage.setItem(`chat_bg_${user.uid}`, bg); 
+          window.alert('Фон чата обновлён!');
+        }; 
+        r.readAsDataURL(f);
+      } catch (err) {
+        window.alert('Ошибка загрузки фона');
+      }
     }
   };
+
+ const handleImageUpload = async (e) => {
+    const f = e.target.files[0];
+    if (f && user) {
+      try {
+        // Показываем локально сразу
+        setProfileImage(URL.createObjectURL(f));
+        
+        // Загружаем в Storage
+        const avatarRef = storageRef(storage, `avatars/${user.uid}`);
+        await uploadBytes(avatarRef, f);
+        const downloadUrl = await getDownloadURL(avatarRef);
+        
+        // Сохраняем URL в базе
+        await set(ref(db, `users/${user.uid}/avatar`), downloadUrl);
+        
+        // Обновляем локально
+        setProfileImage(downloadUrl);
+        window.alert('Аватарка обновлена!');
+      } catch (err) {
+        console.error('Ошибка загрузки аватарки:', err);
+        window.alert('Ошибка: ' + err.message);
+      }
+    }
+  };
+
+const sendPhoto = async (file) => {
+    if (!currentChat || !user) {
+      window.alert('Откройте чат');
+      return;
+    }
+    
+    const IMGBB_API_KEY = '07cad95a42b3b5bea0b29d211b32f60e';
+    
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    try {
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        await push(ref(db, `messages/${currentChat.id}`), {
+          type: 'photo',
+          photoUrl: data.data.url,
+          sender: user.name,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now()
+        });
+        
+        await update(ref(db, `chats/${currentChat.id}`), { 
+          lastMessage: '📷 Фото', 
+          updatedAt: Date.now(), 
+          lastMessageSender: user.name 
+        });
+        
+        scrollToBottom(true);
+      } else {
+        window.alert('Ошибка загрузки фото');
+      }
+    } catch (err) {
+      console.error('Ошибка:', err);
+      window.alert('Ошибка отправки фото');
+    }
+  };
+    
+    
 
   const getAvailableMembers = () => {
     const s = new Set();
@@ -311,7 +490,7 @@ function App() {
       for (let id in all) {
         const c = all[id];
         if (c.type === 'group' && c.members && c.members.includes(name)) {
-          mine.push({ id, name: c.name, type: 'group', lastMessage: c.lastMessage || '', members: c.members, timestamp: c.updatedAt || 0, lastMessageSender: c.lastMessageSender || '' });
+          mine.push({ id, name: c.name, type: 'group', lastMessage: c.lastMessage || '', members: c.members, createdBy: c.createdBy, timestamp: c.updatedAt || 0, lastMessageSender: c.lastMessageSender || '' });
         } else if (id.includes(name)) {
           const comp = id.replace(name + '_', '').replace('_' + name, '');
           mine.push({ id, name: comp, type: 'private', lastMessage: c.lastMessage || '', timestamp: c.updatedAt || 0, lastMessageSender: c.lastMessageSender || '' });
@@ -444,7 +623,18 @@ function App() {
   const cancelEditing = () => { setEditingMessage(null); setInput(''); };
 
   const handleDeleteMessage = async (messageId) => {
-    if (window.confirm('Удалить?')) await remove(ref(db, `messages/${currentChat.id}/${messageId}`));
+    if (window.confirm('Удалить?')) {
+      await remove(ref(db, `messages/${currentChat.id}/${messageId}`));
+      const messagesSnap = await get(ref(db, `messages/${currentChat.id}`));
+      const msgs = messagesSnap.val() || {};
+      const msgArr = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp);
+      const lastMsg = msgArr[0];
+      await update(ref(db, `chats/${currentChat.id}`), { 
+        lastMessage: lastMsg ? (lastMsg.text || '📷 Фото') : 'Нет сообщений',
+        lastMessageSender: lastMsg ? lastMsg.sender : '',
+        updatedAt: lastMsg ? lastMsg.timestamp : Date.now()
+      });
+    }
     setContextMenuState({ visible: false, x: 0, y: 0, messageId: null, text: null, isOwn: false });
   };
 
@@ -461,25 +651,16 @@ function App() {
   };
 
   const showOwnMessageMenu = (e, messageId, text) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const now = Date.now();
-    if (now - lastTap < 300) { setLastTap(0); return; }
-    setLastTap(now);
+    e.preventDefault(); e.stopPropagation();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     const y = e.touches ? e.touches[0].clientY : e.clientY;
     setContextMenuState({ visible: true, x, y, messageId, text, isOwn: true });
   };
 
   const showReactionMenu = (e, messageId) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     const now = Date.now();
-    if (now - lastTap < 300) {
-      setLastTap(0);
-      handleReaction(messageId, defaultReaction);
-      return;
-    }
+    if (now - lastTap < 300) { setLastTap(0); handleReaction(messageId, defaultReaction); return; }
     setLastTap(now);
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     const y = e.touches ? e.touches[0].clientY : e.clientY;
@@ -493,11 +674,7 @@ function App() {
       return receipt && receipt.lastReadId && msg.id <= receipt.lastReadId;
     }
     if (currentChat.type === 'group' && currentChat.members) {
-      return currentChat.members.some(m => {
-        if (m === user.name) return false;
-        const receipt = readReceipts[m];
-        return receipt && receipt.lastReadId && msg.id <= receipt.lastReadId;
-      });
+      return currentChat.members.some(m => { if (m === user.name) return false; const receipt = readReceipts[m]; return receipt && receipt.lastReadId && msg.id <= receipt.lastReadId; });
     }
     return false;
   };
@@ -509,18 +686,54 @@ function App() {
     return counts;
   };
 
-  const saveDefaultReaction = async (reaction) => {
-    setDefaultReaction(reaction);
-    if (user) { await update(ref(db, `users/${user.uid}`), { defaultReaction: reaction }); }
+  const saveDefaultReaction = async (reaction) => { setDefaultReaction(reaction); if (user) await update(ref(db, `users/${user.uid}`), { defaultReaction: reaction }); };
+  const saveLanguage = async (lang) => { setUserLanguage(lang); if (user) await update(ref(db, `users/${user.uid}`), { language: lang }); };
+  const saveDescription = async (desc) => { 
+    setUserDescription(desc);
+    if (user) await update(ref(db, `users/${user.uid}`), { description: desc }); 
+  };
+  const savePrivacySettings = async () => { if (user) { await update(ref(db, `users/${user.uid}`), { privacySettings }); setProfileSection('main'); } };
+
+ const formatLastSeen = (username) => {
+    const userStatus = onlineUsers[username];
+    if (!userStatus) return '';
+    
+    // Получаем настройки приватности пользователя
+    const userPrivacy = privacySettings;
+    
+    if (userPrivacy.hideLastSeen) return t.offline;
+    if (userStatus.online) return t.online;
+    if (!userStatus.lastSeen) return t.offline;
+    
+    const diff = Date.now() - userStatus.lastSeen;
+    if (diff < 60000) return `${t.wasRecently} ${t.online}`;
+    if (diff < 3600000) return `${t.wasRecently} ${Math.floor(diff / 60000)} ${t.minAgo}`;
+    if (diff < 86400000) return `${t.wasRecently} ${Math.floor(diff / 3600000)} ${t.hourAgo}`;
+    return `${t.wasRecently} ${Math.floor(diff / 86400000)} ${t.dayAgo}`;
   };
 
-  const formatLastSeen = (timestamp) => {
-    if (!timestamp) return '';
-    const diff = Date.now() - timestamp;
-    if (diff < 60000) return 'был только что';
-    if (diff < 3600000) return `был ${Math.floor(diff / 60000)} мин назад`;
-    if (diff < 86400000) return `был ${Math.floor(diff / 3600000)} ч назад`;
-    return `был ${Math.floor(diff / 86400000)} дн назад`;
+  const isUserOnline = (username) => {
+    if (privacySettings.hideLastSeen) return false;
+    return onlineUsers[username]?.online || false;
+  };
+
+  const viewUserProfile = async (username) => {
+    const usersSnap = await get(ref(db, 'users'));
+    const users = usersSnap.val() || {};
+    const foundUser = Object.values(users).find(u => u.username === username);
+    if (foundUser) setViewedProfile({ username, ...foundUser });
+  };
+
+  const handleScrollChats = (e) => {
+    const scrollTop = e.target.scrollTop;
+    if (scrollTop > lastScrollTop + 15) {
+      // Скроллим вниз - показываем кнопку
+      setShowPlusButton(true);
+    } else if (scrollTop < lastScrollTop - 5) {
+      // Скроллим вверх - скрываем кнопку
+      setShowPlusButton(false);
+    }
+    setLastScrollTop(scrollTop);
   };
 
   const currentTheme = themes[theme];
@@ -528,10 +741,7 @@ function App() {
   if (authLoading) {
     return (
       <div className="auth" style={{ background: currentTheme.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ color: iconColor, fontSize: 32, marginBottom: 20 }}>StoGramm</h2>
-          <div style={{ color: accentColor, fontSize: 16 }}>Загрузка...</div>
-        </div>
+        <div style={{ textAlign: 'center' }}><h2 style={{ color: iconColor, fontSize: 32 }}>StoGramm</h2></div>
       </div>
     );
   }
@@ -542,7 +752,7 @@ function App() {
         <div className="auth-box" style={{ background: currentTheme.cardBg, border: `1px solid ${currentTheme.border}`, width: 320 }}>
           <h2 style={{ fontSize: 32, background: `linear-gradient(135deg, ${iconColor}, ${accentColor})`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', marginBottom: 20 }}>StoGramm</h2>
           <p style={{ color: currentTheme.text + '99', marginBottom: 20, fontSize: 14 }}>Email {user.email} подтверждён ✅<br/>Придумайте имя:</p>
-          <input type="text" placeholder="Имя" value={username} onChange={e => setUsername(e.target.value)} onKeyPress={e => e.key === 'Enter' && saveUsername()}
+          <input type="text" placeholder="Имя" value={username} onChange={e => setUsername(e.target.value)}
             style={{ width: '100%', padding: 14, margin: '8px 0', background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 28, fontSize: 16 }} autoFocus />
           <button onClick={saveUsername} disabled={loading}
             style={{ width: '100%', padding: 14, marginTop: 16, background: loading ? currentTheme.border : `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, border: 'none', borderRadius: 28, color: '#fff', fontSize: 16, fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer' }}>
@@ -562,13 +772,13 @@ function App() {
             <>
               <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
                 style={{ width: '100%', padding: 14, margin: '8px 0', background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 28, fontSize: 16 }} />
-              <input type="password" placeholder="Пароль" value={password} onChange={e => setPassword(e.target.value)} onKeyPress={e => e.key === 'Enter' && login()}
+              <input type="password" placeholder="Пароль" value={password} onChange={e => setPassword(e.target.value)}
                 style={{ width: '100%', padding: 14, margin: '8px 0', background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 28, fontSize: 16 }} />
               <button onClick={login} disabled={loading}
                 style={{ width: '100%', padding: 14, marginTop: 16, background: loading ? currentTheme.border : `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, border: 'none', borderRadius: 28, color: '#fff', fontSize: 16, fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer' }}>
-                {loading ? '...' : '📧 Войти'}
+                {loading ? '...' : t.login}
               </button>
-              <p onClick={() => setIsLogin(false)} style={{ marginTop: 16, color: accentColor, cursor: 'pointer', fontSize: 14, textAlign: 'center' }}>Нет аккаунта? Зарегистрироваться</p>
+              <p onClick={() => setIsLogin(false)} style={{ marginTop: 16, color: accentColor, cursor: 'pointer', fontSize: 14, textAlign: 'center' }}>{t.noAccount}</p>
             </>
           ) : (
             <>
@@ -576,14 +786,45 @@ function App() {
                 style={{ width: '100%', padding: 14, margin: '8px 0', background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 28, fontSize: 16 }} />
               <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
                 style={{ width: '100%', padding: 14, margin: '8px 0', background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 28, fontSize: 16 }} />
-              <input type="password" placeholder="Пароль (мин. 6)" value={password} onChange={e => setPassword(e.target.value)} onKeyPress={e => e.key === 'Enter' && register()}
+              <input type="password" placeholder="Пароль (мин. 6)" value={password} onChange={e => setPassword(e.target.value)}
                 style={{ width: '100%', padding: 14, margin: '8px 0', background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 28, fontSize: 16 }} />
               <button onClick={register} disabled={loading}
                 style={{ width: '100%', padding: 14, marginTop: 16, background: loading ? currentTheme.border : `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, border: 'none', borderRadius: 28, color: '#fff', fontSize: 16, fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer' }}>
-                {loading ? '...' : '📧 Зарегистрироваться'}
+                {loading ? '...' : t.register}
               </button>
-              <p onClick={() => setIsLogin(true)} style={{ marginTop: 16, color: accentColor, cursor: 'pointer', fontSize: 14, textAlign: 'center' }}>Уже есть аккаунт? Войти</p>
+              <p onClick={() => setIsLogin(true)} style={{ marginTop: 16, color: accentColor, cursor: 'pointer', fontSize: 14, textAlign: 'center' }}>{t.hasAccount}</p>
             </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (viewedProfile) {
+    return (
+      <div className="chat-screen" style={{ background: currentTheme.bg }}
+        onTouchStart={handleChatTouchStart}
+        onTouchEnd={(e) => handleBackSwipe(e, () => setViewedProfile(null))}>
+        <div className="chat-header" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderBottom: `0.5px solid ${currentTheme.border}` }}>
+          <button className="back-btn" onClick={() => setViewedProfile(null)} style={{ color: accentColor }}>←</button>
+          <span style={{ color: iconColor, fontWeight: 'bold' }}>{viewedProfile.username}</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 40, gap: 20 }}>
+          <div style={{ width: 120, height: 120, borderRadius: 60, background: currentTheme.cardBg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            {viewedProfile.avatar ? <img src={viewedProfile.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 50, color: accentColor }}>{viewedProfile.username?.charAt(0).toUpperCase()}</span>}
+          </div>
+          <h2 style={{ color: iconColor }}>{viewedProfile.username}</h2>
+          {viewedProfile.description && <p style={{ color: currentTheme.text + '99', textAlign: 'center' }}>{viewedProfile.description}</p>}
+          <p style={{ color: isUserOnline(viewedProfile.username) ? '#4caf50' : currentTheme.text + '99' }}>
+            {isUserOnline(viewedProfile.username) ? t.online : formatLastSeen(viewedProfile.username)}
+          </p>
+          {viewedProfile.username !== user.name && (
+            <button onClick={async () => {
+              const cid = getChatId(user.name, viewedProfile.username);
+              if (!(await get(ref(db, `chats/${cid}`))).exists()) await set(ref(db, `chats/${cid}`), { type: 'private', lastMessage: 'Нет сообщений', updatedAt: Date.now() });
+              openChat(cid, viewedProfile.username, 'private'); setViewedProfile(null); setActiveTab('chats');
+            }}
+            style={{ padding: '12px 30px', background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, border: 'none', borderRadius: 30, color: '#fff', fontSize: 16, cursor: 'pointer' }}>💬 Написать</button>
           )}
         </div>
       </div>
@@ -592,121 +833,136 @@ function App() {
 
   if (currentChat) {
     const typingUsers = typingStatus[currentChat.id] || [];
-    const typingText = typingUsers.length > 0 ? `${typingUsers.join(', ')} печатает...` : '';
+    const typingText = typingUsers.length > 0 ? `${typingUsers.join(', ')} ${t.typing}` : '';
     const companionStatus = currentChat.type === 'private' ? onlineUsers[currentChat.name] : null;
-    const isOnline = companionStatus?.online;
+    const isOnline = isUserOnline(currentChat.name);
     
     return (
-      <div className="chat-screen" style={{ background: chatBackground }} onTouchStart={handleChatTouchStart} onTouchEnd={handleChatTouchEnd}>
+      <div className="chat-screen" style={{ 
+        background: chatBackground, 
+        animation: 'chatSlideIn 0.3s ease',
+        transform: chatTransition ? 'translateX(100%)' : 'translateX(0)',
+        opacity: chatTransition ? 0 : 1,
+        transition: 'transform 0.3s ease, opacity 0.3s ease'
+      }} onTouchStart={handleChatTouchStart} onTouchEnd={handleChatTouchEnd}>
         <div className="chat-header" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderBottom: `0.5px solid ${currentTheme.border}` }}>
-          <button className="back-btn" onClick={closeChat} style={{ color: accentColor, marginBottom: 4 }}>←</button>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginBottom: 4 }}>
-            <span onClick={showGroupMembers} style={{ cursor: currentChat.type === 'group' ? 'pointer' : 'default', color: iconColor, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button className="back-btn" onClick={closeChat} style={{ color: accentColor }}>←</button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}
+            onClick={() => currentChat.type === 'private' && viewUserProfile(currentChat.name)}>
+            <span style={{ color: iconColor, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentChat.name}
               {isOnline && <span style={{ width: 8, height: 8, borderRadius: 4, background: '#4caf50', display: 'inline-block' }}></span>}
               {currentChat.type === 'group' && ' 👥'}
             </span>
             {currentChat.type === 'private' && companionStatus && (
-              <span style={{ fontSize: 11, color: isOnline ? '#4caf50' : currentTheme.text + '99' }}>
-                {isOnline ? 'онлайн' : formatLastSeen(companionStatus.lastSeen)}
-              </span>
+              <span style={{ fontSize: 11, color: isOnline ? '#4caf50' : currentTheme.text + '99' }}>{isOnline ? t.online : formatLastSeen(currentChat.name)}</span>
             )}
-            {currentChat.type === 'group' && (
-              <span style={{ fontSize: 11, color: currentTheme.text + '99' }}>{currentChat.members?.length || 0} участников</span>
-            )}
+            {currentChat.type === 'group' && <span style={{ fontSize: 11, color: currentTheme.text + '99' }}>{currentChat.members?.length || 0} {t.members}</span>}
           </div>
         </div>
         {typingText && <div className="typing-indicator" style={{ color: accentColor }}>{typingText}</div>}
         {editingMessage && (
           <div className="editing-panel" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderBottom: `0.5px solid ${currentTheme.border}` }}>
-            <span style={{ color: accentColor }}>✏️ Редактирование</span>
-            <button onClick={cancelEditing} style={{ color: accentColor, background: 'none', border: 'none', cursor: 'pointer' }}>✖ Отмена</button>
+            <span style={{ color: accentColor }}>{t.edit}</span>
+            <button onClick={cancelEditing} style={{ color: accentColor, background: 'none', border: 'none', cursor: 'pointer' }}>{t.cancel}</button>
           </div>
         )}
         <div className="messages" ref={messagesContainerRef} style={{ paddingBottom: 20 }}>
-          {messages.map(msg => {
-            const isSent = msg.sender === user.name;
-            const read = isMessageRead(msg);
-            const msgReactions = getMessageReactions(msg.id);
-            return (
-              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isSent ? 'flex-end' : 'flex-start' }}>
-                <div className={`message ${isSent ? 'sent' : 'received'} ${msg.edited ? 'edited' : ''}`}
-                  onClick={(e) => {
-                    if (isSent) showOwnMessageMenu(e, msg.id, msg.text);
-                    else showReactionMenu(e, msg.id);
-                  }}
-                  style={isSent ? { background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, cursor: 'pointer' } : { background: `${currentTheme.cardBg}cc`, cursor: 'pointer' }}>
-                  {currentChat.type === 'group' && !isSent && (
-                    <div style={{ fontSize: 11, color: accentColor, marginBottom: 2, fontWeight: 'bold' }}>{msg.sender}</div>
-                  )}
-                  <div>{msg.text}{msg.edited && <span className="edited-badge"> (изменено)</span>}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
-                    {read && <span style={{ color: '#4caf50', fontSize: 12 }}>✓✓</span>}
-                    {isSent && !read && <span style={{ color: currentTheme.text + '77', fontSize: 12 }}>✓</span>}
-                    <span className="time" style={{ color: currentTheme.text + '99' }}>{msg.time}</span>
-                  </div>
-                </div>
-                {Object.keys(msgReactions).length > 0 && (
-                  <div style={{ marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {Object.entries(msgReactions).map(([r, count]) => (
-                      <span key={r} style={{ background: currentTheme.cardBg, borderRadius: 12, padding: '2px 8px', fontSize: 13, cursor: 'pointer' }}
-                        onClick={() => handleReaction(msg.id, r)}>
-                        {r} {count > 1 && count}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+  {messages.map(msg => {
+    const isSent = msg.sender === user.name;
+    const read = isMessageRead(msg);
+    const msgReactions = getMessageReactions(msg.id);
+    return (
+      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isSent ? 'flex-end' : 'flex-start' }}>
+        <div className={`message ${isSent ? 'sent' : 'received'} ${msg.edited ? 'edited' : ''}`}
+          onClick={(e) => { e.stopPropagation(); if (isSent) showOwnMessageMenu(e, msg.id, msg.text); else showReactionMenu(e, msg.id); }}
+          style={isSent ? { background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', userSelect: 'none' } : { background: `${currentTheme.cardBg}cc`, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', userSelect: 'none' }}>
+          {currentChat.type === 'group' && !isSent && <div style={{ fontSize: 11, color: accentColor, marginBottom: 2, fontWeight: 'bold' }}>{msg.sender}</div>}
+          {msg.type === 'photo' || msg.type === 'video' ? (
+            <img src={msg.photoUrl} alt="Фото" style={{ maxWidth: 250, maxHeight: 300, borderRadius: 12, cursor: 'pointer' }} onClick={() => setFullscreenImage(msg.photoUrl)} />
+          ) : (
+            <div>{msg.text}{msg.edited && <span className="edited-badge"> {t.edited}</span>}</div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+            {read && <span style={{ color: '#4caf50', fontSize: 12 }}>✓✓</span>}
+            {isSent && !read && <span style={{ color: currentTheme.text + '77', fontSize: 12 }}>✓</span>}
+            <span className="time" style={{ color: currentTheme.text + '99' }}>{msg.time}</span>
+          </div>
         </div>
+        {Object.keys(msgReactions).length > 0 && (
+          <div style={{ marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {Object.entries(msgReactions).map(([r, count]) => (
+              <span key={r} style={{ background: currentTheme.cardBg, borderRadius: 12, padding: '2px 8px', fontSize: 13, cursor: 'pointer' }} onClick={() => handleReaction(msg.id, r)}>{r} {count > 1 && count}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
         {contextMenuState.visible && (
-          <div ref={contextMenuRef} className="context-menu" style={{ 
-            position: 'fixed', left: Math.min(contextMenuState.x - 70, window.innerWidth - 280), 
-            top: Math.max(60, contextMenuState.y - 120), background: currentTheme.cardBg, 
-            borderRadius: 14, zIndex: 200, minWidth: contextMenuState.isOwn ? 160 : 280,
-            maxWidth: 300, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', padding: '8px 0'
-          }}>
+          <div ref={contextMenuRef} className="context-menu" style={{ position: 'fixed', left: Math.min(contextMenuState.x - 70, window.innerWidth - 280), top: Math.max(60, contextMenuState.y - 120), background: currentTheme.cardBg, borderRadius: 14, zIndex: 200, minWidth: contextMenuState.isOwn ? 160 : 280, maxWidth: 300, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', padding: '8px 0' }}>
             {contextMenuState.isOwn ? (
               <>
-                <div onClick={() => startEditing(contextMenuState.messageId, contextMenuState.text)} style={{ padding: '14px 20px', cursor: 'pointer', color: currentTheme.text }}>✏️ Изменить</div>
-                <div onClick={() => handleDeleteMessage(contextMenuState.messageId)} style={{ padding: '14px 20px', cursor: 'pointer', color: accentColor }}>🗑️ Удалить</div>
+                <div onClick={() => startEditing(contextMenuState.messageId, contextMenuState.text)} style={{ padding: '14px 20px', cursor: 'pointer', color: currentTheme.text }}>{t.edit}</div>
+                <div onClick={() => handleDeleteMessage(contextMenuState.messageId)} style={{ padding: '14px 20px', cursor: 'pointer', color: accentColor }}>{t.delete}</div>
               </>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 12px', justifyContent: 'center' }}>
                 {availableReactions.map(r => (
-                  <span key={r} onClick={() => handleReaction(contextMenuState.messageId, r)} style={{
-                    fontSize: 24, cursor: 'pointer', padding: 4, borderRadius: 8, userSelect: 'none'
-                  }}>{r}</span>
+                  <span key={r} onClick={() => handleReaction(contextMenuState.messageId, r)} style={{ fontSize: 24, cursor: 'pointer', padding: 4, borderRadius: 8, userSelect: 'none' }}>{r}</span>
                 ))}
               </div>
             )}
           </div>
         )}
-        <div className="input-area" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderTop: `0.5px solid ${currentTheme.border}`, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input ref={inputRef} value={input} onChange={handleInputChange} onFocus={handleInputFocus} onKeyPress={e => e.key === 'Enter' && sendMessage()}
-            placeholder={editingMessage ? "Измените..." : "Сообщение..."}
-            style={{ background: currentTheme.bg, color: currentTheme.text, flex: 1, padding: '12px 18px', borderRadius: 30, border: 'none', fontSize: 16, outline: 'none' }} />
-          <button onClick={sendMessage}
-            style={{ padding: '0 24px', height: 44, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, color: '#fff', border: 'none', borderRadius: 30, fontSize: 18, cursor: 'pointer', fontWeight: 'bold' }}>
-            📤
-          </button>
-        </div>
+    
+<div className="input-area" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderTop: `0.5px solid ${currentTheme.border}`, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+  <input type="file" ref={photoInputRef} style={{ display: 'none' }} accept="image/*,video/*" onChange={e => { if (e.target.files[0]) sendPhoto(e.target.files[0]); e.target.value = ''; }} />
+  <button onClick={() => photoInputRef.current?.click()} style={{ background: 'none', border: 'none', color: accentColor, fontSize: 22, cursor: 'pointer', padding: 6, flexShrink: 0 }}>📎</button>
+  <input ref={inputRef} value={input} onChange={handleInputChange} onFocus={handleInputFocus} onKeyPress={e => e.key === 'Enter' && sendMessage()}
+    placeholder={editingMessage ? t.editMsg : t.message}
+    style={{ background: currentTheme.bg, color: currentTheme.text, flex: 1, minWidth: 0, padding: '10px 14px', borderRadius: 25, border: 'none', fontSize: 15, outline: 'none' }} />
+  <button onClick={sendMessage}
+    style={{ padding: '8px 18px', height: 40, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, color: '#fff', border: 'none', borderRadius: 25, fontSize: 14, cursor: 'pointer', fontWeight: 'bold', flexShrink: 0, whiteSpace: 'nowrap' }}>
+    {t.send}
+  </button>
+</div>
+        {fullscreenImage && (
+          <div 
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.95)', zIndex: 300,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center'
+            }}
+            onClick={() => setFullscreenImage(null)}
+          >
+            <div style={{ position: 'absolute', top: 40, right: 20, zIndex: 301 }}>
+              <button onClick={() => setFullscreenImage(null)}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: 28, width: 44, height: 44, borderRadius: 22, cursor: 'pointer', marginBottom: 10, display: 'block' }}>✕</button>
+              <a href={fullscreenImage} download
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: 20, width: 44, height: 44, borderRadius: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>⬇</a>
+            </div>
+            <img src={fullscreenImage} alt="Полный размер" 
+              style={{ maxWidth: '95%', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8 }}
+              onClick={(e) => e.stopPropagation()} />
+          </div>
+        )}
         {groupMembers && (
           <div className="group-members-popup">
             <div className="group-members-popup-content" style={{ background: currentTheme.cardBg }}>
-              <h4 style={{ color: iconColor }}>Участники ({groupMembers.length})</h4>
+              <h4 style={{ color: iconColor }}>{t.participants} ({groupMembers.length})</h4>
               {groupMembers.map((m, i) => {
-                const memberStatus = onlineUsers[m];
-                const memberOnline = memberStatus?.online;
+                const memberOnline = isUserOnline(m);
                 return (
                   <div key={i} style={{ color: currentTheme.text, padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>👤 {m}</span>
-                    {memberOnline ? <span style={{ color: '#4caf50', fontSize: 12 }}>онлайн</span> : <span style={{ fontSize: 11, color: currentTheme.text + '77' }}>{memberStatus ? formatLastSeen(memberStatus.lastSeen) : 'офлайн'}</span>}
+                    <span style={{ cursor: 'pointer' }} onClick={() => viewUserProfile(m)}>👤 {m}</span>
+                    {memberOnline ? <span style={{ color: '#4caf50', fontSize: 12 }}>{t.online}</span> : <span style={{ fontSize: 11, color: currentTheme.text + '77' }}>{formatLastSeen(m)}</span>}
                   </div>
                 );
               })}
-              <button onClick={() => setGroupMembers(null)} style={{ background: accentColor, color: '#fff', padding: '10px 20px', border: 'none', borderRadius: 20, marginTop: 16, cursor: 'pointer' }}>Закрыть</button>
+              <button onClick={() => setGroupMembers(null)} style={{ background: accentColor, color: '#fff', padding: '10px 20px', border: 'none', borderRadius: 20, marginTop: 16, cursor: 'pointer' }}>{t.close}</button>
             </div>
           </div>
         )}
@@ -714,24 +970,119 @@ function App() {
     );
   }
 
+  // Экран настроек (profileSection !== 'main')
+  if (activeTab === 'profile' && profileSection !== 'main') {
+    return (
+      <div className="chat-screen" style={{ background: currentTheme.bg }}
+        onTouchStart={handleChatTouchStart}
+        onTouchEnd={(e) => handleBackSwipe(e, () => setProfileSection('main'))}>
+        <div className="chat-header" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderBottom: `0.5px solid ${currentTheme.border}` }}>
+          <button className="back-btn" onClick={() => setProfileSection('main')} style={{ color: accentColor }}>←</button>
+          <span style={{ color: iconColor, fontWeight: 'bold' }}>
+            {profileSection === 'settings' ? t.settings : profileSection === 'language' ? t.language : profileSection === 'reactions' ? t.reaction : t.privacy}
+          </span>
+        </div>
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+          {profileSection === 'settings' && (
+            <div>
+              <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
+                <h3 style={{ marginBottom: 12, color: iconColor }}>{t.bgChat}</h3>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {['#0f0f0f', '#1a1a2e', '#2d2d44', '#1e3a2e'].map(bg => (
+                    <button key={bg} onClick={() => { setChatBackground(bg); localStorage.setItem(`chat_bg_${user.uid}`, bg); }} style={{ width: 50, height: 50, borderRadius: 25, background: bg, border: 'none', cursor: 'pointer' }}></button>
+                  ))}
+                  <button onClick={() => bgFileInputRef.current?.click()} style={{ padding: '0 16px', height: 50, borderRadius: 25, background: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}`, cursor: 'pointer' }}>{t.customBg}</button>
+                  <input type="file" ref={bgFileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleBgUpload} />
+                </div>
+              </div>
+              <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
+                <h3 style={{ marginBottom: 12, color: iconColor }}>{t.theme}</h3>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {Object.entries(themes).map(([k, th]) => (
+                    <button key={k} onClick={() => changeTheme(k)} style={{ padding: '8px 16px', borderRadius: 30, background: th.bg, color: th.text, border: theme === k ? `2px solid ${accentColor}` : `1px solid ${currentTheme.border}`, cursor: 'pointer', fontWeight: theme === k ? 'bold' : 'normal' }}>{th.name}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
+                <h3 style={{ marginBottom: 12, color: iconColor }}>{t.accent}</h3>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {accentColors.map(c => (
+                    <button key={c.value} onClick={() => changeAccent(c.value)} style={{ width: 40, height: 40, borderRadius: 20, background: c.value, border: accentColor === c.value ? `3px solid ${iconColor}` : 'none', cursor: 'pointer' }}></button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
+                <h3 style={{ marginBottom: 12, color: iconColor }}>{t.iconColor}</h3>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {iconColors.map(c => (
+                    <button key={c.value} onClick={() => changeIconColor(c.value)} style={{ width: 40, height: 40, borderRadius: 20, background: c.value, border: iconColor === c.value ? `3px solid ${accentColor}` : 'none', cursor: 'pointer' }}></button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {profileSection === 'language' && (
+            <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20 }}>
+              <h3 style={{ marginBottom: 12, color: iconColor }}>{t.language}</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {languages.map(l => (
+                  <button key={l.code} onClick={() => saveLanguage(l.code)} style={{ padding: '14px 20px', borderRadius: 16, background: userLanguage === l.code ? accentColor : currentTheme.bg, color: userLanguage === l.code ? '#fff' : currentTheme.text, border: 'none', cursor: 'pointer', fontSize: 16, textAlign: 'left' }}>{l.name}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {profileSection === 'reactions' && (
+            <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20 }}>
+              <h3 style={{ marginBottom: 12, color: iconColor }}>{t.reaction}</h3>
+              <p style={{ fontSize: 12, color: currentTheme.text + '77', marginBottom: 12 }}>{t.doubleTap}</p>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {availableReactions.map(r => (
+                  <button key={r} onClick={() => saveDefaultReaction(r)} style={{ fontSize: 32, background: defaultReaction === r ? `${accentColor}30` : 'transparent', border: defaultReaction === r ? `2px solid ${accentColor}` : '2px solid transparent', borderRadius: 12, padding: '8px 12px', cursor: 'pointer' }}>{r}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {profileSection === 'privacy' && (
+            <div style={{ background: currentTheme.cardBg, borderRadius: 20, padding: 20 }}>
+              <h3 style={{ marginBottom: 12, color: iconColor }}>{t.privacy}</h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
+                <input type="checkbox" checked={privacySettings.hideLastSeen} onChange={e => setPrivacySettings({...privacySettings, hideLastSeen: e.target.checked})} />
+                <span style={{ color: currentTheme.text }}>{t.hideLastSeen}</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
+                <input type="checkbox" checked={privacySettings.hideAvatar} onChange={e => setPrivacySettings({...privacySettings, hideAvatar: e.target.checked})} />
+                <span style={{ color: currentTheme.text }}>{t.hideAvatar}</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
+                <input type="checkbox" checked={privacySettings.hideDescription} onChange={e => setPrivacySettings({...privacySettings, hideDescription: e.target.checked})} />
+                <span style={{ color: currentTheme.text }}>{t.hideDescription}</span>
+              </label>
+              <button onClick={savePrivacySettings} style={{ padding: '12px 24px', background: accentColor, border: 'none', borderRadius: 20, color: '#fff', cursor: 'pointer', fontSize: 16 }}>{t.save}</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app" style={{ background: currentTheme.bg, color: currentTheme.text }}>
-      <div className="header" style={{ background: currentTheme.cardBg, borderBottom: `0.5px solid ${currentTheme.border}`, padding: '16px 20px', textAlign: 'center' }}>
+      <div className="header" style={{ background: currentTheme.cardBg, borderBottom: `0.5px solid ${currentTheme.border}`, padding: '16px 20px', paddingTop: 'env(safe-area-inset-top, 24px)', minHeight: 70, textAlign: 'center', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
         <span style={{ fontWeight: 'bold', fontSize: 18, color: iconColor }}>StoGramm</span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '8px 0', background: currentTheme.bg }}>
         {tabs.map((tab, i) => (
-          <div key={tab} onClick={() => setActiveTab(tab)} style={{ width: i === currentTabIndex ? 24 : 6, height: 6, borderRadius: 3, background: i === currentTabIndex ? accentColor : currentTheme.border, transition: 'all 0.3s ease', cursor: 'pointer' }} />
+          <div key={tab} onClick={() => { setActiveTab(tab); setProfileSection('main'); }} style={{ width: i === currentTabIndex ? 24 : 6, height: 6, borderRadius: 3, background: i === currentTabIndex ? accentColor : currentTheme.border, transition: 'all 0.3s ease', cursor: 'pointer' }} />
         ))}
       </div>
       <div className="main-content" onTouchStart={handleSwipeStart} onTouchMove={handleSwipeMove} onTouchEnd={handleSwipeEnd} style={{ overflow: 'hidden', position: 'relative' }}>
-        <div style={{ display: 'flex', height: '100%', transition: 'transform 0.3s ease', transform: `translateX(-${currentTabIndex * 100}%)` }}>
-          <div style={{ minWidth: '100%', height: '100%', overflowY: 'auto' }}>
-            <div className="chats">
-              {chats.length === 0 && <div style={{ textAlign: 'center', padding: 60 }}><p style={{ color: currentTheme.text + '99' }}>📭 Нет диалогов</p></div>}
+        <div ref={swipeTrackRef} style={{ display: 'flex', height: '100%', transition: 'transform 0.3s ease', transform: `translateX(-${currentTabIndex * 100}%)`, willChange: 'transform' }}>
+          {/* Чаты */}
+          <div style={{ minWidth: '100%', height: '100%', overflowY: 'auto' }} onScroll={handleScrollChats}>
+            <div className="chats" ref={chatListRef}>
+              {chats.length === 0 && <div style={{ textAlign: 'center', padding: 60 }}><p style={{ color: currentTheme.text + '99' }}>{t.noChats}</p></div>}
               {chats.map(chat => {
-                const companionStatus = chat.type === 'private' ? onlineUsers[chat.name] : null;
-                const isOnline = companionStatus?.online;
+                const isOnline = isUserOnline(chat.name);
                 return (
                   <div key={chat.id} className="chat-item" onClick={() => openChat(chat.id, chat.name, chat.type, chat.createdBy, chat.members)} onContextMenu={e => showChatMenu(e, chat.id, chat.name)}
                     style={{ background: currentTheme.cardBg, padding: '14px 16px', marginBottom: 8, borderRadius: 14, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
@@ -748,9 +1099,7 @@ function App() {
                         {chat.type === 'private' && isOnline && <span style={{ width: 6, height: 6, borderRadius: 3, background: '#4caf50', display: 'inline-block' }}></span>}
                       </div>
                       <div style={{ fontSize: 12, color: unreadChats[chat.id] ? accentColor : currentTheme.text + '99', fontWeight: unreadChats[chat.id] ? 'bold' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {chat.type === 'group' && chat.lastMessageSender && chat.lastMessageSender !== user.name && (
-                          <span style={{ color: accentColor }}>{chat.lastMessageSender}: </span>
-                        )}
+                        {chat.type === 'group' && chat.lastMessageSender && chat.lastMessageSender !== user.name && <span style={{ color: accentColor }}>{chat.lastMessageSender}: </span>}
                         {unreadChats[chat.id] && '● '}{chat.lastMessage}
                       </div>
                     </div>
@@ -758,7 +1107,12 @@ function App() {
                 );
               })}
             </div>
+            {showPlusButton && activeTab === 'chats' && (
+              <button onClick={() => setActiveTab('search')}
+                style={{ position: 'fixed', bottom: 90, right: 20, width: 56, height: 56, borderRadius: 28, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, border: 'none', color: '#fff', fontSize: 28, cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+            )}
           </div>
+          {/* Профиль */}
           <div style={{ minWidth: '100%', height: '100%', overflowY: 'auto' }}>
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div onClick={() => fileInputRef.current?.click()} style={{ position: 'relative', width: 100, height: 100, borderRadius: 50, background: currentTheme.cardBg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', marginBottom: 16 }}>
@@ -768,107 +1122,110 @@ function App() {
               <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleImageUpload} />
               <h2 style={{ marginBottom: 24, color: iconColor }}>{user.name}</h2>
               <div style={{ width: '100%', background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 12, color: iconColor }}>Фон чата</h3>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {['#0f0f0f', '#1a1a2e', '#2d2d44', '#1e3a2e'].map(bg => (
-                    <button key={bg} onClick={() => { setChatBackground(bg); localStorage.setItem(`chat_bg_${user.uid}`, bg); }} style={{ width: 50, height: 50, borderRadius: 25, background: bg, border: 'none', cursor: 'pointer' }}></button>
-                  ))}
-                  <button onClick={() => bgFileInputRef.current?.click()} style={{ padding: '0 16px', height: 50, borderRadius: 25, background: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}`, cursor: 'pointer' }}>🖼️ Своё</button>
-                  <input type="file" ref={bgFileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleBgUpload} />
-                </div>
+                <h3 style={{ marginBottom: 12, color: iconColor }}>{t.description}</h3>
+                <input type="text" placeholder={t.description} value={userDescription} 
+                  onChange={e => { saveDescription(e.target.value); }}
+                  style={{ width: '100%', padding: 14, background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 30 }} />
               </div>
-              <div style={{ width: '100%', background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 12, color: iconColor }}>Тема</h3>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {Object.entries(themes).map(([k, t]) => (
-                    <button key={k} onClick={() => changeTheme(k)} style={{ padding: '8px 16px', borderRadius: 30, background: t.bg, color: t.text, border: theme === k ? `2px solid ${accentColor}` : `1px solid ${currentTheme.border}`, cursor: 'pointer', fontWeight: theme === k ? 'bold' : 'normal' }}>{t.name}</button>
-                  ))}
-                </div>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                <button onClick={() => setProfileSection('settings')} style={{ width: '100%', padding: 16, background: currentTheme.cardBg, borderRadius: 16, border: 'none', color: currentTheme.text, fontSize: 16, cursor: 'pointer', textAlign: 'left' }}>⚙️ {t.settings}</button>
+                <button onClick={() => setProfileSection('language')} style={{ width: '100%', padding: 16, background: currentTheme.cardBg, borderRadius: 16, border: 'none', color: currentTheme.text, fontSize: 16, cursor: 'pointer', textAlign: 'left' }}>🌐 {t.language}</button>
+                <button onClick={() => setProfileSection('reactions')} style={{ width: '100%', padding: 16, background: currentTheme.cardBg, borderRadius: 16, border: 'none', color: currentTheme.text, fontSize: 16, cursor: 'pointer', textAlign: 'left' }}>❤️ {t.reaction}</button>
+                <button onClick={() => setProfileSection('privacy')} style={{ width: '100%', padding: 16, background: currentTheme.cardBg, borderRadius: 16, border: 'none', color: currentTheme.text, fontSize: 16, cursor: 'pointer', textAlign: 'left' }}>🔒 {t.privacy}</button>
               </div>
-              <div style={{ width: '100%', background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 12, color: iconColor }}>Цвет акцента</h3>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {accentColors.map(c => (
-                    <button key={c.value} onClick={() => changeAccent(c.value)} style={{ width: 40, height: 40, borderRadius: 20, background: c.value, border: accentColor === c.value ? `3px solid ${iconColor}` : 'none', cursor: 'pointer' }}></button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ width: '100%', background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 12, color: iconColor }}>Цвет иконок</h3>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {iconColors.map(c => (
-                    <button key={c.value} onClick={() => changeIconColor(c.value)} style={{ width: 40, height: 40, borderRadius: 20, background: c.value, border: iconColor === c.value ? `3px solid ${accentColor}` : 'none', cursor: 'pointer' }}></button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ width: '100%', background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 12, color: iconColor }}>Реакция по умолчанию</h3>
-                <p style={{ fontSize: 12, color: currentTheme.text + '77', marginBottom: 12 }}>Двойное нажатие поставит эту реакцию</p>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {availableReactions.map(r => (
-                    <button key={r} onClick={() => saveDefaultReaction(r)} style={{ 
-                      fontSize: 28, background: defaultReaction === r ? `${accentColor}30` : 'transparent',
-                      border: defaultReaction === r ? `2px solid ${accentColor}` : '2px solid transparent',
-                      borderRadius: 12, padding: '4px 8px', cursor: 'pointer'
-                    }}>{r}</button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={handleLogout} style={{ width: '100%', padding: 14, borderRadius: 30, background: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}`, fontSize: 16, fontWeight: 'bold', cursor: 'pointer' }}>🚪 Выйти</button>
+                            {(!window.Capacitor || !window.Capacitor.isNativePlatform()) && (
+  <div style={{ width: '100%', background: currentTheme.cardBg, borderRadius: 20, padding: 20, marginBottom: 16 }}>
+    <h3 style={{ marginBottom: 12, color: iconColor }}>{t.downloadApp}</h3>
+    <a 
+      href="/stogramm.apk" 
+      download="StoGramm.apk"
+      style={{ 
+        padding: '12px 24px', 
+        background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, 
+        color: '#fff', 
+        border: 'none', 
+        borderRadius: 30, 
+        fontSize: 16, 
+        cursor: 'pointer', 
+        textDecoration: 'none', 
+        display: 'inline-block' 
+      }}
+    >
+      📱 Скачать APK
+    </a>
+  </div>
+)}
+              <button onClick={handleLogout} style={{ width: '100%', padding: 14, borderRadius: 30, background: `${accentColor}20`, color: accentColor, border: `1px solid ${accentColor}`, fontSize: 16, fontWeight: 'bold', cursor: 'pointer' }}>{t.logout}</button>
             </div>
           </div>
+          {/* Группы */}
           <div style={{ minWidth: '100%', height: '100%', overflowY: 'auto' }}>
             <div style={{ padding: 20 }}>
               <div style={{ background: currentTheme.cardBg, borderRadius: 24, padding: 24 }}>
-                <h3 style={{ marginBottom: 20, color: iconColor }}>Создать группу</h3>
-                <input type="text" placeholder="Название" value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+                <h3 style={{ marginBottom: 20, color: iconColor }}>{t.createGroupTitle}</h3>
+                <input type="text" placeholder={t.groupName} value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
                   style={{ width: '100%', padding: 14, marginBottom: 20, background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 30 }} />
+                <p style={{ color: currentTheme.text + '99', marginBottom: 12 }}>{t.selectMembers}:</p>
                 <div style={{ maxHeight: 250, overflowY: 'auto', marginBottom: 20 }}>
                   {getAvailableMembers().map(m => {
-                    const memberStatus = onlineUsers[m];
+                    const memberOnline = isUserOnline(m);
                     return (
                       <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', cursor: 'pointer' }}>
                         <input type="checkbox" checked={selectedMembers.includes(m)} onChange={e => e.target.checked ? setSelectedMembers([...selectedMembers, m]) : setSelectedMembers(selectedMembers.filter(x => x !== m))} />
                         <span style={{ color: currentTheme.text }}>👤 {m}</span>
-                        {memberStatus?.online && <span style={{ width: 6, height: 6, borderRadius: 3, background: '#4caf50' }}></span>}
+                        {memberOnline && <span style={{ width: 6, height: 6, borderRadius: 3, background: '#4caf50' }}></span>}
                       </label>
                     );
                   })}
                 </div>
-                <button onClick={createGroup} style={{ width: '100%', padding: 14, borderRadius: 30, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, color: '#fff', border: 'none', fontSize: 16, fontWeight: 'bold', cursor: 'pointer' }}>➕ Создать</button>
-              </div>
-            </div>
-          </div>
-          <div style={{ minWidth: '100%', height: '100%', overflowY: 'auto' }}>
-            <div style={{ padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-              <div style={{ background: currentTheme.cardBg, borderRadius: 24, padding: 32, maxWidth: 340, textAlign: 'center' }}>
-                <h3 style={{ marginBottom: 20, color: iconColor }}>Найти пользователя</h3>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                  <input type="text" placeholder="Имя" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyPress={e => e.key === 'Enter' && searchAndAddUser()}
-                    style={{ flex: 1, padding: 14, background: currentTheme.bg, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, borderRadius: 30 }} />
-                  <button onClick={searchAndAddUser} style={{ padding: '14px 20px', borderRadius: 30, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>🔍</button>
-                </div>
-                <p style={{ fontSize: 12, color: currentTheme.text + '77' }}>Введите имя для поиска</p>
+                <button onClick={createGroup} style={{ width: '100%', padding: 14, borderRadius: 30, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, color: '#fff', border: 'none', fontSize: 16, fontWeight: 'bold', cursor: 'pointer' }}>{t.create}</button>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div className="bottom-nav" style={{ display: 'flex', justifyContent: 'space-around', padding: '10px 0', background: currentTheme.cardBg + 'cc', backdropFilter: 'blur(10px)', borderTop: `0.5px solid ${currentTheme.border}` }}>
+      {/* Экран поиска */}
+      {activeTab === 'search' && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: currentTheme.bg, zIndex: 300, display: 'flex', flexDirection: 'column' }}
+          onTouchStart={handleChatTouchStart}
+          onTouchEnd={(e) => handleBackSwipe(e, () => setActiveTab('chats'))}>
+          <div className="chat-header" style={{ background: `${currentTheme.cardBg}cc`, backdropFilter: 'blur(10px)', borderBottom: `0.5px solid ${currentTheme.border}` }}>
+            <button className="back-btn" onClick={() => setActiveTab('chats')} style={{ color: accentColor }}>←</button>
+            <span style={{ color: iconColor, fontWeight: 'bold' }}>{t.searchUser}</span>
+          </div>
+          <div style={{ padding: 20, flex: 1, overflowY: 'auto' }}>
+            <div style={{ background: currentTheme.cardBg, borderRadius: 24, padding: 24, maxWidth: 500, margin: '0 auto', textAlign: 'center' }}>
+              <h3 style={{ marginBottom: 20, color: iconColor, fontSize: 22 }}>{t.findUser}</h3>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <input type="text" placeholder="Username" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyPress={e => e.key === 'Enter' && searchAndAddUser()}
+                  style={{ flex: 1, padding: 14, background: currentTheme.bg, color: currentTheme.text, border: `2px solid ${currentTheme.border}`, borderRadius: 30, fontSize: 16, minWidth: 0 }} autoFocus />
+                <button onClick={searchAndAddUser} style={{ padding: '14px 20px', borderRadius: 30, background: `linear-gradient(135deg, ${accentColor}, ${accentColor}dd)`, color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>🔍</button>
+              </div>
+              <p style={{ fontSize: 13, color: currentTheme.text + '77' }}>Введите имя пользователя для поиска</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="bottom-nav" style={{ display: 'flex', justifyContent: 'space-around', 
+  padding: '8px 0 16px 0', 
+  paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)', 
+  background: currentTheme.cardBg + 'cc', 
+  backdropFilter: 'blur(10px)', 
+  borderTop: `0.5px solid ${currentTheme.border}` 
+}}>
         {tabs.map(tab => (
-          <div key={tab} onClick={() => setActiveTab(tab)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 20px', borderRadius: 30, cursor: 'pointer', background: activeTab === tab ? accentColor + '20' : 'transparent' }}>
-            <span style={{ fontSize: 24, color: activeTab === tab ? accentColor : iconColor }}>{tab === 'chats' ? '💬' : tab === 'profile' ? '👤' : tab === 'groups' ? '👥' : '🔍'}</span>
-            <span style={{ fontSize: 11, color: activeTab === tab ? accentColor : currentTheme.text + '99' }}>{tab === 'chats' ? 'Чаты' : tab === 'profile' ? 'Профиль' : tab === 'groups' ? 'Группы' : 'Поиск'}</span>
+          <div key={tab} onClick={() => { setActiveTab(tab); setProfileSection('main'); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 18px', borderRadius: 30, cursor: 'pointer', background: activeTab === tab ? accentColor + '20' : 'transparent' }}>
+            <span style={{ fontSize: 22, color: activeTab === tab ? accentColor : iconColor }}>{tab === 'chats' ? '💬' : tab === 'profile' ? '👤' : '👥'}</span>
+            <span style={{ fontSize: 10, color: activeTab === tab ? accentColor : currentTheme.text + '99' }}>{t[tab]}</span>
           </div>
         ))}
       </div>
       {chatMenuState.visible && (
         <div className="context-menu" style={{ position: 'fixed', left: chatMenuState.x - 70, top: chatMenuState.y - 80, background: currentTheme.cardBg, borderRadius: 14, zIndex: 1000, minWidth: 160, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-          <div onClick={() => deleteChat(chatMenuState.chatId, chatMenuState.chatName)} style={{ padding: '14px 20px', cursor: 'pointer', color: accentColor }}>🗑️ Удалить чат</div>
+          <div onClick={() => deleteChat(chatMenuState.chatId, chatMenuState.chatName)} style={{ padding: '14px 20px', cursor: 'pointer', color: accentColor }}>🗑️ {t.deleteChat}</div>
         </div>
       )}
     </div>
   );
 }
-
 export default App;
