@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, push, onChildAdded, onChildChanged, onChildRemoved, set, onValue, update, remove, get, onDisconnect } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -237,9 +237,9 @@ function App() {
   }, [currentChat]);
 
   useEffect(() => {
-    if (user && !showUsernamePrompt) {
+    if (user && !showUsernamePrompt) {  
       const savedTheme = localStorage.getItem(`theme_${user.uid}`);
-      const savedAccent = localStorage.getItem(`accent_${user.uid}`);
+      const savedAccent = localStorage.getItem(`accent_${user.uid}`); 
       const savedIconColor = localStorage.getItem(`icon_${user.uid}`);
       if (savedTheme) setTheme(savedTheme);
       if (savedAccent) setAccentColor(savedAccent);
@@ -248,9 +248,9 @@ function App() {
       if (savedBg && savedBg !== 'undefined' && savedBg !== '#0f0f0f') setChatBackground(savedBg);
       loadProfileImage();
     }
-  }, [user, showUsernamePrompt]);
+  }, [user, showUsernamePrompt, loadProfileImage]);
 
-  useEffect(() => { if (user) loadUnreadStatus(); }, [user, chats]);
+  useEffect(() => { if (user) loadUnreadStatus(); }, [user, chats, loadUnreadStatus]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -263,11 +263,21 @@ function App() {
     return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('touchstart', handleClickOutside); };
   }, [contextMenuState.visible]);
 
-  const loadProfileImage = async () => {
+  const loadProfileImage = useCallback(async () => {
     if (!user) return;
     const snap = await get(ref(db, `users/${user.uid}/avatar`));
     if (snap.exists()) setProfileImage(snap.val());
-  };
+  }, [user]);
+
+const loadUnreadStatus = useCallback(() => {
+    if (!user) return;
+    const u = {};
+    chats.forEach(c => {
+      const last = parseInt(localStorage.getItem(`lastRead_${user.name}_${c.id}`) || '0');
+      if ((c.timestamp || 0) > last && c.lastMessageSender && c.lastMessageSender !== user.name) u[c.id] = true;
+    });
+    setUnreadChats(u);
+  }, [user, chats]);
 
   const changeTheme = (th) => { setTheme(th); localStorage.setItem(`theme_${user?.uid}`, th); };
   const changeAccent = (c) => { setAccentColor(c); localStorage.setItem(`accent_${user?.uid}`, c); };
@@ -288,15 +298,7 @@ function App() {
   const handleInputFocus = () => scrollToBottom(true);
   const focusInput = () => setTimeout(() => { if (inputRef.current) { inputRef.current.focus(); scrollToBottom(true); } }, 100);
 
-  const loadUnreadStatus = () => {
-    if (!user) return;
-    const u = {};
-    chats.forEach(c => {
-      const last = parseInt(localStorage.getItem(`lastRead_${user.name}_${c.id}`) || '0');
-      if ((c.timestamp || 0) > last && c.lastMessageSender && c.lastMessageSender !== user.name) u[c.id] = true;
-    });
-    setUnreadChats(u);
-  };
+  
 
   // Плавный свайп с отслеживанием пальца
   const handleSwipeStart = (e) => {
