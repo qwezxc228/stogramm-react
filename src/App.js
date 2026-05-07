@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, push, onChildAdded, onChildChanged, onChildRemoved, set, onValue, update, remove, get, onDisconnect } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -21,7 +21,6 @@ const storage = getStorage(app);
 const auth = getAuth(app);
 
 function App() {
-  const [recordingTime, setRecordingTime] = useState(0);
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [user, setUser] = useState(null);
   const [chats, setChats] = useState([]);
@@ -235,7 +234,11 @@ function App() {
       return () => { unsub(); reactionsUnsub(); };
     }
   }, [currentChat]);
-
+const loadProfileImage = async () => {
+    if (!user) return;
+    const snap = await get(ref(db, `users/${user.uid}/avatar`));
+    if (snap.exists()) setProfileImage(snap.val());
+  };
   useEffect(() => {
     if (user && !showUsernamePrompt) {  
       const savedTheme = localStorage.getItem(`theme_${user.uid}`);
@@ -248,10 +251,18 @@ function App() {
       if (savedBg && savedBg !== 'undefined' && savedBg !== '#0f0f0f') setChatBackground(savedBg);
       loadProfileImage();
     }
-  }, [user, showUsernamePrompt, loadProfileImage]);
+  }, [user, showUsernamePrompt]);
 
-  useEffect(() => { if (user) loadUnreadStatus(); }, [user, chats, loadUnreadStatus]);
-
+ 
+const loadUnreadStatus = () => {
+    if (!user) return;
+    const u = {};
+    chats.forEach(c => {
+      const last = parseInt(localStorage.getItem(`lastRead_${user.name}_${c.id}`) || '0');
+      if ((c.timestamp || 0) > last && c.lastMessageSender && c.lastMessageSender !== user.name) u[c.id] = true;
+    });
+    setUnreadChats(u);
+  };
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (contextMenuState.visible && contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
@@ -263,21 +274,14 @@ function App() {
     return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('touchstart', handleClickOutside); };
   }, [contextMenuState.visible]);
 
-  const loadProfileImage = useCallback(async () => {
-    if (!user) return;
-    const snap = await get(ref(db, `users/${user.uid}/avatar`));
-    if (snap.exists()) setProfileImage(snap.val());
-  }, [user]);
 
-const loadUnreadStatus = useCallback(() => {
-    if (!user) return;
-    const u = {};
-    chats.forEach(c => {
-      const last = parseInt(localStorage.getItem(`lastRead_${user.name}_${c.id}`) || '0');
-      if ((c.timestamp || 0) > last && c.lastMessageSender && c.lastMessageSender !== user.name) u[c.id] = true;
-    });
-    setUnreadChats(u);
+
+ // Стало (правильно):
+useEffect(() => { 
+    if (user) loadUnreadStatus(); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, chats]);
+
 
   const changeTheme = (th) => { setTheme(th); localStorage.setItem(`theme_${user?.uid}`, th); };
   const changeAccent = (c) => { setAccentColor(c); localStorage.setItem(`accent_${user?.uid}`, c); };
