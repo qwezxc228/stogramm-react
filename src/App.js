@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, push, onChildAdded, onChildChanged, onChildRemoved, set, onValue, update, remove, get, onDisconnect } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -178,6 +179,27 @@ function App() {
   const t = translations[userLanguage] || translations.ru;
 
   useEffect(() => {
+    const setupPushNotifications = async () => {
+  // 1. Запрашиваем разрешение (важно для Android 13+)
+  const permission = await FirebaseMessaging.requestPermissions();
+  
+  if (permission.receive === 'granted') {
+    // 2. Получаем токен
+    const { token } = await FirebaseMessaging.getToken();
+    console.log('FCM TOKEN:', token);
+    
+    // 3. Отправляем токен в вашу базу данных Firebase
+    // Привязываем токен к текущему пользователю
+    if (user) {
+      await update(ref(db, `users/${user.uid}`), { fcmToken: token });
+    }
+  }
+};
+useEffect(() => {
+  if (user) {
+    setupPushNotifications();
+  }
+}, [user]);
     const savedUser = localStorage.getItem('stogramm_user');
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
