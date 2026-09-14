@@ -14,7 +14,7 @@ public class MessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(String token) {
         super.onNewToken(token);
-        // Отправьте этот токен на ваш сервер/Realtime Database
+        // Отправьте токен на ваш сервер (в Realtime Database)
         System.out.println("FCM Token: " + token);
     }
 
@@ -22,15 +22,16 @@ public class MessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         
-        String title = remoteMessage.getNotification().getTitle();
-        String body = remoteMessage.getNotification().getBody();
-
-        showNotification(title, body);
+        // Показываем уведомление, когда приложение в фоне/закрыто
+        if (remoteMessage.getNotification() != null) {
+            String title = remoteMessage.getNotification().getTitle();
+            String body = remoteMessage.getNotification().getBody();
+            showNotification(title, body);
+        }
     }
 
     private void showNotification(String title, String body) {
         String channelId = "messages";
-        
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
